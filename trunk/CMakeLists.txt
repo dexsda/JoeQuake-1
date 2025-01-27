@@ -98,6 +98,8 @@ add_executable(joequake-gl
     pr_comp.h
     pr_edict.c
     pr_exec.c
+    practice.c
+    practice.h
     progdefs.h
     progs.h
     protocol.h
