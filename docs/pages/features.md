@@ -95,3 +95,5 @@ IMPORTANT: make sure the dzip binary (dzip.exe, comes with the JoeQuake zip) is 
 {% include subfeatures/better-look.md %}
 
 {% include subfeatures/md3-models.md %}
+
+{% include subfeatures/bhop-practice.md %}
