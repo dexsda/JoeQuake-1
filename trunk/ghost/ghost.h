@@ -30,6 +30,8 @@ void Ghost_Init (void);
 void Ghost_Finish (char *map_name, double finish_time);
 qboolean Ghost_AutoId (char *name, vec3_t origin);
 void Ghost_Shutdown (void);
+FILE * Ghost_OpenDemoOrDzip (const char *demo_path);
+
 
 typedef struct {
     byte colors;

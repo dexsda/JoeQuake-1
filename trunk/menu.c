@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "sound.h"
 #include "winquake.h"
+#include "qcurses.h"
 
 qboolean vid_windowedmouse = true;
 void (*vid_menudrawfn)(void);
@@ -8817,7 +8818,14 @@ void M_Draw (void)
 		break;
 
 	case m_demos:
-		M_Demos_Draw ();
+#ifdef GLQUAKE
+		int browserscale = vid.width / 8 >=240 ? 2 : 1;
+		glMatrixMode (GL_PROJECTION);
+		glLoadIdentity ();
+		glOrtho (0, vid.width / browserscale, vid.height / browserscale, 0, -99999, 99999);
+#endif
+		M_Demos_Display(vid.width / browserscale, vid.height / browserscale);
+		//M_Demos_Draw ();
 		break;
 
 	case m_mods:
@@ -8922,7 +8930,7 @@ void M_Keydown (int key)
 	case m_videomodes:		M_VideoModes_Key (key); return;
 	case m_nehdemos:		M_NehDemos_Key (key); return;
 	case m_maps:			M_Maps_Key (key); return;
-	case m_demos:			M_Demos_Key (key); return;
+	case m_demos:			M_Demos_KeyHandle (key); return;
 	case m_mods:			M_Mods_Key(key); return;
 	case m_help:			M_Help_Key (key); return;
 	case m_quit:			M_Quit_Key (key); return;
