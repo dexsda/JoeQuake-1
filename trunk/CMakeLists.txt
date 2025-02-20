@@ -98,8 +98,6 @@ add_executable(joequake-gl
     pr_comp.h
     pr_edict.c
     pr_exec.c
-    practice.c
-    practice.h
     progdefs.h
     progs.h
     protocol.h
@@ -151,6 +149,8 @@ add_executable(joequake-gl
     demoparse.h
     demoseekparse.c
     democam.c
+    bhop/practice.c
+    bhop/practice.h
     ghost/ghost.c
     ghost/ghost.h
     ghost/ghost_private.h
