@@ -480,7 +480,7 @@ char	demodir[MAX_OSPATH] = "";
 char	prevdir[MAX_OSPATH] = "";
 char	searchfile[MAX_FILELENGTH] = "";
 
-static	int	list_cursor = 0, list_base = 0, num_searchs = 0;
+int	list_cursor = 0, list_base = 0, num_searchs = 0;
 static qboolean	searchbox = false;
 
 extern	int	key_insert;
@@ -626,6 +626,7 @@ void M_List_Key (int k, int num_elements, int num_lines)
 	switch (k)
 	{
 	case K_UPARROW:
+    case 'k':
 		S_LocalSound("misc/menu1.wav");
 		if (list_cursor == 0)
 		{
@@ -640,6 +641,7 @@ void M_List_Key (int k, int num_elements, int num_lines)
 			list_base--;
 		break;
 
+    case 'j':
 	case K_DOWNARROW:
 		S_LocalSound ("misc/menu1.wav");
 		if (list_cursor + list_base == num_elements - 1)

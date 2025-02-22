@@ -28,22 +28,38 @@
 #ifndef _QCURSES_H_
 #define _QCURSES_H_
 
-typedef struct qcurses_char {
+typedef struct qcurses_char_s {
     unsigned char symbol;
     long background;
     char decoration;
 } qcurses_char_t;
 
-typedef struct qcurses_box {
+typedef struct qcurses_box_s {
     qcurses_char_t ** grid;
     int cols;
     int rows;
 } qcurses_box_t;
 
+typedef struct qcurses_list_s {
+    int cursor;
+    int len;
+    int places;
+    int window_start;
+    char (*array)[80];
+} qcurses_list_t;
+
 enum demos_tabs {
     TAB_LOCAL_DEMOS = 1,
     TAB_SDA_NEWS,
     TAB_SDA_DATABASE
+};
+
+enum browser_columns {
+    COL_MAP = 1,
+    COL_TYPE,
+    COL_RECORD,
+    COL_COMMENT_LOADING,
+    COL_COMMENT_LOADED
 };
 
 void M_Demos_Display(int width, int height);
