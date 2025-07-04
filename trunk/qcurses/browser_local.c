@@ -40,6 +40,7 @@ extern char ghost_demo_path[MAX_OSPATH];
 extern int browserscale;
 
 static qboolean search_input = false;
+static qboolean found = false;
 
 static char search_term[41] = "\0";
 static char * qcurses_skills[4] = { "Easy", "Normal", "Hard", "Nightmare" };
@@ -328,9 +329,11 @@ void M_Demos_LocalRead(int rows, char * prevdir) {
     SDL_SemPost(filelist_lock);
 #endif
 
-    int j = 0;
+    int j = 0, search = -1;
     for (int i = 0; i < num_files; i++) {
-        if (!search_term[0] || Q_strcasestr(filelist[i].name, search_term)) {
+        if (search == -1 && search_term[0] && Q_strcasestr(filelist[i].name, search_term)) {
+            search = j;
+        }
             demlist->entries[j].name = Q_strdup(filelist[i].name);
             demlist->entries[j].type = filelist[i].type;
             demlist->entries[j].size = filelist[i].size;
@@ -354,13 +357,15 @@ void M_Demos_LocalRead(int rows, char * prevdir) {
             }
 #endif
             j++;
-        }
+        //}
     }
 
-    if (search_term[0]) {
-        demlist->list.len = j;
+    if (search != -1) {
+        demlist->list.cursor = search;
+        found = true;
+    } else {
+        qcurses_list_move_cursor((qcurses_list_t *)demlist, 0);
     }
-    qcurses_list_move_cursor((qcurses_list_t *)demlist, 0);
 }
 
 /*
@@ -388,8 +393,13 @@ void M_Demos_KeyHandle_Local_Search (int k, int max_lines) {
         break;
     }
 
-    if (strlen(search_term) != len)
+    if (strlen(search_term) != len) {
+        found = false;
         M_Demos_LocalRead(max_lines, NULL);
+
+        if (!found && strlen(search_term) > len)
+            search_term[len] = '\0';
+    }
 }
 
 /*
@@ -466,6 +476,7 @@ void M_Demos_KeyHandle_Local (int k, int max_lines) {
             } else {
                 strncat (demodir, va("/%s", demlist->entries[demlist->list.cursor].name), sizeof(demodir) - strlen(demodir) - 1);
             }
+            memset(search_term, 0, strlen(search_term));
             M_Demos_LocalRead(max_lines, prevdir);
         } else {
             if (keydown[K_CTRL] && !keydown[K_SHIFT]) {
