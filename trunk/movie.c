@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifdef _WIN32
 #include "movie_avi.h"
-#include "movie_ffmpeg.h"
+#include "movie_ff-win.h"
 #else
 #include "movie_ff-linux.h"
 #endif
