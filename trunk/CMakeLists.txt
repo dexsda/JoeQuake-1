@@ -148,8 +148,8 @@ add_executable(joequake-gl
     democam.c
     movie.c
     movie.h
-    movie_ffmpeg.c
-    movie_ffmpeg.h
+    movie_ff-linux.c
+    movie_ff-linux.h
     ghost/ghost.c
     ghost/ghost.h
     ghost/ghost_private.h

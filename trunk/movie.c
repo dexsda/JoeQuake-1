@@ -21,7 +21,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "movie.h"
+
+#ifdef _WIN32
 #include "movie_ffmpeg.h"
+#else
+#include "movie_ff-linux.h"
+#endif
+
 #include "screen.h"
 
 extern	float	scr_con_current;
