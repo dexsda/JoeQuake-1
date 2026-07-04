@@ -729,7 +729,6 @@ void _Host_Frame (double time)
 
 	if (!cl_independentphysics.value || physframe)
 	{
-
 		// get new key events
 		Sys_SendKeyEvents();
 
@@ -1112,7 +1111,7 @@ void Host_Shutdown (void)
 
 	if (Movie_IsActive ())
 	{
-		Con_Printf ("Finishing capture before exit (this may take up to 30 seconds)...\n");
+		Con_Printf ("Finishing capture before exit...\n");
 		Movie_CancelCaptureStats ();
 		Movie_Stop ();
 	}
