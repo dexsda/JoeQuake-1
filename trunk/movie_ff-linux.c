@@ -155,12 +155,12 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 	Q_snprintfz (
 		pipename_audio,
 		sizeof (pipename_audio),
-		"%s/a_%d_%lu.pipe", dir, pid, now
+		"%s/a_%d_%lu.pipe", "/tmp", pid, now
 	);
 	Q_snprintfz (
 		pipename_video,
 		sizeof (pipename_video),
-		"%s/v_%d_%lu.pipe", dir, pid, now
+		"%s/v_%d_%lu.pipe", "/tmp", pid, now
 	);
 
 	if (mkfifo(pipename_video, 0666))
@@ -272,8 +272,12 @@ void Movie_FFmpeg_Close (void)
 	SCR_EndLoadingPlaque();
 	Con_Printf("Muxing...\n");
 
-	waitpid(0, NULL, 0);
-	waitpid(0, NULL, 0);
+	waitpid(0, &status, 0);
+	if (!WIFEXITED(status))
+		Con_Printf("Error quitting ffmpeg!\n");
+	waitpid(0, &status, 0);
+	if (!WIFEXITED(status))
+		Con_Printf("Error quitting ffmpeg!\n");
 
 	unlink(pipename_audio);
 	unlink(pipename_video);
@@ -294,6 +298,8 @@ void Movie_FFmpeg_Close (void)
 		default:
 			m_sink_mode = FFMPEG_SINK_NONE;
 			waitpid(0, NULL, 0);
+			if (!WIFEXITED(status))
+				Con_Printf("Error quitting mux ffmpeg!\n");
 			Con_Printf("Muxing completed to filename %s\n", outpath_combined);
 			return;
 	}
