@@ -23,10 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "winquake.h"
 #include "ghost/demosummary.h"
 #include <time.h>	// easyrecord stats
-
-#ifdef _WIN32
 #include "movie.h"
-#else
+
+#ifndef _WIN32
 #include "errno.h"
 #endif
 
@@ -123,10 +122,7 @@ void CL_StopPlayback (void)
 	if (cls.timedemo)
 		CL_FinishTimeDemo ();
 
-#ifdef _WIN32
 	Movie_StopPlayback ();
-#endif
-
 }
 
 /*
@@ -687,9 +683,9 @@ static void PlayDZDemo (void)
 			cls.demofile = NULL;
 			cls.state = ca_connected;
 			break;
-        default:
-            Sys_Error("Invalid dzip status %d", dzip_status);
-            return;
+		default:
+			Sys_Error("Invalid dzip status %d", dzip_status);
+			return;
 	}
 }
 

@@ -1620,7 +1620,7 @@ void Draw_BeginDisc (void)
 {
 	float	scale;
 
-	if (!draw_disc)
+	//if (!draw_disc)
 		return;
 
 	scale = Sbar_GetScaleAmount();

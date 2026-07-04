@@ -299,7 +299,6 @@ int main (int argc, char **argv)
 	fcntl (0, F_SETFL, fcntl(0, F_GETFL, 0) | FNDELAY);
 
 	Host_Init (&parms);
-
 #if id386
 	Sys_SetFPCW ();
 #endif

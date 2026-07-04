@@ -22,9 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "bhop/practice.h"
 #include "billiards/billiards.h"
-#ifdef _WIN32
 #include "movie.h"
-#endif
 
 /*
 
@@ -541,9 +539,7 @@ void SCR_Init (void)
 	SCR_LoadPics();
 	SCR_LoadCursorImage();
 
-#ifdef _WIN32
 	Movie_Init ();
-#endif
 
 	scr_initialized = true;
 }
@@ -1408,9 +1404,7 @@ void SCR_UpdateScreen (void)
 
 	GLSLGamma_GammaCorrect();
 
-#ifdef _WIN32
 	Movie_UpdateScreen ();
-#endif
 
 	GL_EndRendering ();
 }
