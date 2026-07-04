@@ -66,6 +66,7 @@ cvar_t	capture_codec	= {"capture_codec", "0"};
 cvar_t	capture_mp3	= {"capture_mp3", "0"};
 cvar_t	capture_mp3_kbps = {"capture_mp3_kbps", "128"};
 cvar_t	capture_avi = {"capture_avi", "1"};
+cvar_t	capture_avi_split = {"capture_avi_split", "1900"};
 /* legacy = AVI or TGA (see capture_avi); raw = *_ffmpeg_*.raw|pcm; ffmpeg = pipe to ffmpeg.exe -> stem.mp4 (Win32) */
 cvar_t	capture_mode = {"capture_mode", "legacy"};
 #endif
@@ -75,24 +76,40 @@ cvar_t	capture_console	= {"capture_console", "1"};
 #ifdef _WIN32
 cvar_t	capture_ffmpeg_video_buf_mb     = {"capture_ffmpeg_video_buf_mb", "32"};
 cvar_t	capture_ffmpeg_audio_buf_mb     = {"capture_ffmpeg_audio_buf_mb", "4"};
+cvar_t	capture_ffmpeg_write_timeout_ms = {"capture_ffmpeg_write_timeout_ms", "5000"};
 #endif
 cvar_t	capture_ffmpeg_loglevel         = {"capture_ffmpeg_loglevel", "error"};
 cvar_t	capture_ffmpeg_report           = {"capture_ffmpeg_report", "0"};
-cvar_t	capture_ffmpeg_write_timeout_ms = {"capture_ffmpeg_write_timeout_ms", "5000"};
 cvar_t	capture_ffmpeg_container        = {"capture_ffmpeg_container", "mp4"};
-cvar_t	capture_ffmpeg_video_args       = {"capture_ffmpeg_video_args", "-c:v libx265 -preset fast -crf 16 -pix_fmt yuv420p"};
+cvar_t	capture_ffmpeg_video_args       = {"capture_ffmpeg_video_args", "-c:v libx265 -preset fast -crf 18 -pix_fmt yuv420p"};
 cvar_t	capture_ffmpeg_audio_args       = {"capture_ffmpeg_audio_args", "-c:a aac -b:a 256k -ar 48000"};
 
 static qboolean movie_is_capturing = false;
 qboolean	avi_loaded, acm_loaded;
 
+#ifdef _WIN32
+static SYSTEMTIME movie_start_date; 
+#endif
 static int movie_avi_num_segments;
 static char movie_avi_path[256];
 
 typedef enum {
 	MOVIE_CAP_NONE,
-	MOVIE_CAP_ENCODE, /* piped ffmpeg -> mp4 (capture_mode ffmpeg, Win32) */
+#ifdef _WIN32
+	MOVIE_CAP_AVI,
+	MOVIE_CAP_RAW,	/* raw RGB + PCM files (capture_mode raw) */
+	MOVIE_CAP_TGA,
+#endif
+	MOVIE_CAP_ENCODE /* piped ffmpeg -> mp4 */
 } movie_capture_kind_t;
+
+#ifdef _WIN32
+typedef enum {
+	CAPMODE_LEGACY,
+	CAPMODE_RAW,
+	CAPMODE_FFMPEG
+} capture_mode_kind_t;
+#endif
 
 static movie_capture_kind_t movie_capture_kind = MOVIE_CAP_NONE;
 
@@ -140,6 +157,23 @@ void Movie_CancelCaptureStats (void)
 {
 	capture_report_stats = false;
 }
+#ifdef _WIN32
+static capture_mode_kind_t Movie_ParseCaptureMode (void)
+{
+	const char *s = capture_mode.string;
+
+	if (!s || !*s)
+		return CAPMODE_LEGACY;
+	if (!Q_strcasecmp (s, "legacy"))
+		return CAPMODE_LEGACY;
+	if (!Q_strcasecmp (s, "raw"))
+		return CAPMODE_RAW;
+	if (!Q_strcasecmp (s, "ffmpeg"))
+		return CAPMODE_FFMPEG;
+	Con_Printf ("Unknown capture_mode \"%s\" (expected legacy, raw, or ffmpeg); using legacy\n", s);
+	return CAPMODE_LEGACY;
+}
+#endif
 
 qboolean Movie_IsActive (void)
 {
@@ -150,6 +184,48 @@ qboolean Movie_IsActive (void)
 	// otherwise output if a file is open to write to
 	return movie_is_capturing;
 }
+
+#ifdef _WIN32
+void Movie_StartNewAviSegment()
+{
+	char segment_name[5];
+	char path[sizeof(movie_avi_path) + sizeof(segment_name)];
+
+	if (movie_avi_num_segments > 0)
+	{
+		COM_StripExtension(movie_avi_path, path);
+		Q_snprintfz(segment_name, sizeof(segment_name), "_%03d", movie_avi_num_segments);
+		strncat(path, segment_name, sizeof(path));
+		COM_ForceExtension(path, ".avi");
+	}
+	else
+	{
+		Q_strncpyz(path, movie_avi_path, sizeof(path));
+	}
+
+	if (!(moviefile = fopen(path, "wb")))
+	{
+		COM_CreatePath(path);
+		if (!(moviefile = fopen(path, "wb")))
+		{
+			Con_Printf("ERROR: Couldn't open %s\n", path);
+			movie_capture_kind = MOVIE_CAP_NONE;
+			return;
+		}
+	}
+
+	movie_is_capturing = Capture_Open(path);
+	if (movie_is_capturing)
+	{
+		movie_capture_kind = MOVIE_CAP_AVI;
+		if (movie_avi_num_segments == 0)
+			Movie_ResetCaptureAudioSync ();
+	}
+	else
+		movie_capture_kind = MOVIE_CAP_NONE;
+	++movie_avi_num_segments;
+}
+#endif
 
 void Movie_MaybeAutoQuit (void)
 {
@@ -176,44 +252,97 @@ void Movie_Start_f (void)
 		return;
 	}
 
-	int	w, h, fps;
-	Q_strncpyz (stem, Cmd_Argv (1), sizeof (stem));
-	COM_StripExtension (stem, stem);
-	if (!stem[0])
+#ifdef _WIN32
+	switch (Movie_ParseCaptureMode ())
 	{
-		Con_Printf ("ERROR: Invalid capture name\n");
+	case CAPMODE_RAW:
+		Q_strncpyz (stem, Cmd_Argv (1), sizeof (stem));
+		COM_StripExtension (stem, stem);
+		if (!stem[0])
+		{
+			Con_Printf ("ERROR: Invalid capture name\n");
+			return;
+		}
+		Q_snprintfz (dir, sizeof (dir), "%s", !COM_IsAbsolutePath (capture_dir.string) ? va ("%s/%s", com_basedir, capture_dir.string) : capture_dir.string);
+		if (!Movie_FFmpeg_Open (dir, stem))
+			return;
+		movie_capture_kind = MOVIE_CAP_RAW;
+		movie_is_capturing = true;
+		Movie_ResetCaptureAudioSync ();
 		return;
-	}
-	Q_snprintfz (dir, sizeof (dir), "%s", !COM_IsAbsolutePath (capture_dir.string) ? va ("%s/%s", com_basedir, capture_dir.string) : capture_dir.string);
-	if (!shm)
-	{
-		Con_Printf ("ERROR: capture_mode ffmpeg: sound not initialized (shm)\n");
-		return;
-	}
-	fps = (int)(!capture_fps.value ? 30 : bound (10, capture_fps.value, 100000));
-#ifdef GLQUAKE
-	w = glwidth;
-	h = glheight;
-#else
-	w = vid.width;
-	h = vid.height;
-#endif
-    Con_Printf("Settings: %d %d %d", w, h, shm->speed);
-	if (w <= 0 || h <= 0 || shm->speed <= 0)
-	{
-		Con_Printf ("ERROR: capture_mode ffmpeg: invalid size or sample rate\n");
-		return;
-	}
-	if (!Movie_FFmpeg_Encode_Open (dir, stem, w, h, fps, shm->speed))
-	{
-		Con_Printf ("capture_mode ffmpeg failed (need Win32 build, ffmpeg.exe next to exe, usable codecs for capture_ffmpeg_video_args / capture_ffmpeg_audio_args)\n");
-		return;
-	}
-	movie_capture_kind = MOVIE_CAP_ENCODE;
-	movie_is_capturing = true;
-	Movie_ResetCaptureAudioSync ();
-	return;
 
+	case CAPMODE_FFMPEG:
+	{
+#endif
+		int	w, h, fps;
+		Q_strncpyz (stem, Cmd_Argv (1), sizeof (stem));
+		COM_StripExtension (stem, stem);
+		if (!stem[0])
+		{
+			Con_Printf ("ERROR: Invalid capture name\n");
+			return;
+		}
+		Q_snprintfz (dir, sizeof (dir), "%s", !COM_IsAbsolutePath (capture_dir.string) ? va ("%s/%s", com_basedir, capture_dir.string) : capture_dir.string);
+		if (!shm)
+		{
+			Con_Printf ("ERROR: capture_mode ffmpeg: sound not initialized (shm)\n");
+			return;
+		}
+		fps = (int)(!capture_fps.value ? 30 : bound (10, capture_fps.value, 100000));
+	#ifdef GLQUAKE
+		w = glwidth;
+		h = glheight;
+	#else
+		w = vid.width;
+		h = vid.height;
+	#endif
+	    Con_Printf("Settings: %d %d %d", w, h, shm->speed);
+		if (w <= 0 || h <= 0 || shm->speed <= 0)
+		{
+			Con_Printf ("ERROR: capture_mode ffmpeg: invalid size or sample rate\n");
+			return;
+		}
+		if (!Movie_FFmpeg_Encode_Open (dir, stem, w, h, fps, shm->speed))
+		{
+			Con_Printf ("capture_mode ffmpeg failed (need Win32 build, ffmpeg.exe next to exe, usable codecs for capture_ffmpeg_video_args / capture_ffmpeg_audio_args)\n");
+			return;
+		}
+		movie_capture_kind = MOVIE_CAP_ENCODE;
+		movie_is_capturing = true;
+		Movie_ResetCaptureAudioSync ();
+		return;
+#ifdef _WIN32
+	}
+
+	case CAPMODE_LEGACY:
+	default:
+		break;
+	}
+
+	if (capture_avi.value)
+	{
+		if (!avi_loaded)
+		{
+			Con_Printf ("ERROR: AVI capture unavailable (avifil32 not loaded). Use capture_mode raw.\n");
+			return;
+		}
+
+		Q_strncpyz (name, Cmd_Argv (1), sizeof (name));
+		COM_ForceExtension (name, ".avi");
+
+		Q_snprintfz (movie_avi_path, sizeof (movie_avi_path), "%s/%s", !COM_IsAbsolutePath (capture_dir.string) ? va ("%s/%s", com_basedir, capture_dir.string) : capture_dir.string, name);
+
+		movie_avi_num_segments = 0;
+		Movie_StartNewAviSegment ();
+		return;
+	}
+
+	GetLocalTime (&movie_start_date); 
+
+	movie_frame_count = 0;
+	movie_capture_kind = MOVIE_CAP_TGA;
+	movie_is_capturing = true;
+#endif
 }
 
 static void Movie_ResetCaptureAudioSync (void)
@@ -239,8 +368,14 @@ static int Movie_AdvanceCaptureAudioSync (void)
 
 void Movie_Stop (void)
 {
+#ifdef _WIN32
+	qboolean	was_avi = (movie_capture_kind == MOVIE_CAP_AVI);
+	qboolean	was_raw_or_encode = (movie_capture_kind == MOVIE_CAP_RAW || movie_capture_kind == MOVIE_CAP_ENCODE);
+	qboolean	was_capturing = (was_avi || was_raw_or_encode);
+#else
 	qboolean	was_raw_or_encode = movie_capture_kind == MOVIE_CAP_ENCODE;
 	qboolean	was_capturing = was_raw_or_encode;
+#endif
 
 	/* Flush partly-buffered PCM so ffmpeg/raw files see audio aligned with video at EOF */
 	if (was_raw_or_encode && captured_audio_samples > 0)
@@ -257,6 +392,13 @@ void Movie_Stop (void)
 	movie_is_capturing = false;
 	movie_capture_kind = MOVIE_CAP_NONE;
 
+#ifdef _WIN32
+	if (was_avi)
+	{
+		Capture_Close ();
+		fclose (moviefile);
+	}
+#endif
 	if (was_raw_or_encode)
 		Movie_FFmpeg_Close ();
 
@@ -334,14 +476,16 @@ void Movie_CaptureDemo_f (void)
 		return;
 	}
 
-    if (!ready_for_capture)
-    {
+#ifndef _WIN32
+	if (!ready_for_capture)
+	{
 		Con_Printf ("Still initializing system...\n");
-        char buf[128];
-        Q_snprintfz(buf, sizeof(buf) - 1, "wait; wait; wait; wait; wait; wait; wait; capturedemo %s\n", Cmd_Argv(1));
-        Cbuf_AddText (buf);
-        return;
-    }
+		char buf[128];
+		Q_snprintfz(buf, sizeof(buf) - 1, "wait; wait; wait; wait; wait; wait; wait; capturedemo %s\n", Cmd_Argv(1));
+		Cbuf_AddText (buf);
+		return;
+	}
+#endif
 
 	Con_Printf ("Capturing %s.dem\n", Cmd_Argv (1));
 
@@ -377,17 +521,22 @@ void Movie_Init (void)
 	Cvar_Register (&capture_console);
 	Cvar_Register (&capture_autoquit);
 #ifdef _WIN32
+	Cvar_Register (&capture_mode);
+	Cvar_Register (&capture_codec);
+	Cvar_Register (&capture_avi);
+	Cvar_Register (&capture_avi_split);
 	Cvar_Register (&capture_ffmpeg_video_buf_mb);
 	Cvar_Register (&capture_ffmpeg_audio_buf_mb);
+	Cvar_Register (&capture_ffmpeg_write_timeout_ms);
 #endif
 	Cvar_Register (&capture_ffmpeg_loglevel);
 	Cvar_Register (&capture_ffmpeg_report);
-	Cvar_Register (&capture_ffmpeg_write_timeout_ms);
 	Cvar_Register (&capture_ffmpeg_container);
 	Cvar_Register (&capture_ffmpeg_video_args);
 	Cvar_Register (&capture_ffmpeg_audio_args);
 
 #ifdef _WIN32
+	AVI_LoadLibrary ();
 	ACM_LoadLibrary ();
 	if (acm_loaded)
 	{
@@ -418,7 +567,38 @@ void Movie_UpdateScreen (void)
 	if (!Movie_IsActive ())
 		return;
 
+#ifdef _WIN32
+	/* TGA sequence: no shared RGB buffer path */
+	if (movie_capture_kind == MOVIE_CAP_TGA)
+	{
+		char name[128];
+
+		Q_snprintfz (name, sizeof (name), "%s/capture_%02d-%02d-%04d_%02d-%02d-%02d/shot-%06i.tga",
+			capture_dir.string, movie_start_date.wDay, movie_start_date.wMonth, movie_start_date.wYear,
+			movie_start_date.wHour, movie_start_date.wMinute, movie_start_date.wSecond, movie_frame_count);
+
+		movie_frame_count++;
+		if (capture_report_stats)
+			capture_frames++;
+		SCR_ScreenShot (name);
+		return;
+	}
+
+	if (movie_capture_kind == MOVIE_CAP_AVI)
+	{
+		if (capture_avi_split.value > 0 && Capture_GetNumWrittenBytes () >= capture_avi_split.value * 1024 * 1024)
+		{
+			Movie_Stop ();
+			Movie_StartNewAviSegment ();
+			if (!movie_is_capturing)
+				return;
+		}
+	}
+
+	if (movie_capture_kind == MOVIE_CAP_AVI || movie_capture_kind == MOVIE_CAP_RAW || movie_capture_kind == MOVIE_CAP_ENCODE)
+#else
 	if (movie_capture_kind == MOVIE_CAP_ENCODE)
+#endif
 	{
 #ifdef GLQUAKE
 		int	i, size = glwidth * glheight * 3;
@@ -427,8 +607,20 @@ void Movie_UpdateScreen (void)
 		buffer = Q_malloc (size);
 		glReadPixels (glx, gly, glwidth, glheight, GL_RGB, GL_UNSIGNED_BYTE, buffer);
 		ApplyGamma (buffer, size);
-
-		Movie_FFmpeg_WriteVideo (buffer, size); /* RAW or ENCODE */
+#ifdef _WIN32
+		if (movie_capture_kind == MOVIE_CAP_AVI)
+		{
+			for (i = 0 ; i < size ; i += 3)
+			{
+				temp = buffer[i];
+				buffer[i] = buffer[i + 2];
+				buffer[i + 2] = temp;
+			}
+			Capture_WriteVideo (buffer);
+		}
+		else
+#endif
+			Movie_FFmpeg_WriteVideo (buffer, size); /* RAW or ENCODE */
 
 		free (buffer);
 #else
@@ -456,7 +648,11 @@ void Movie_UpdateScreen (void)
 
 		{
 			int size = vid.width * vid.height * 3;
+#ifdef _WIN32
+			if (movie_capture_kind == MOVIE_CAP_RAW || movie_capture_kind == MOVIE_CAP_ENCODE)
+#else
 			if (movie_capture_kind == MOVIE_CAP_ENCODE)
+#endif
 			{
 				int k;
 				/* software buffer is BGR order; ffmpeg rgb24 wants R,G,B */
@@ -468,6 +664,10 @@ void Movie_UpdateScreen (void)
 				}
 				Movie_FFmpeg_WriteVideo (buffer, size);
 			}
+#ifdef _WIN32
+			else
+				Capture_WriteVideo (buffer);
+#endif
 		}
 
 		free (buffer);
@@ -482,8 +682,16 @@ static void Movie_FlushCaptureAudio (void)
 {
 	if (captured_audio_samples <= 0)
 		return;
+#ifdef _WIN32
+	if (movie_capture_kind == MOVIE_CAP_RAW || movie_capture_kind == MOVIE_CAP_ENCODE)
+#else
 	if (movie_capture_kind == MOVIE_CAP_ENCODE)
+#endif
 		Movie_FFmpeg_WriteAudio (captured_audio_samples, (byte *)capture_audio_samples);
+#ifdef _WIN32
+	else
+		Capture_WriteAudio (captured_audio_samples, (byte *)capture_audio_samples);
+#endif
 	captured_audio_samples = 0;
 }
 
@@ -491,7 +699,11 @@ void Movie_TransferStereo16 (void)
 {
 	if (!Movie_IsActive ())
 		return;
+#ifdef _WIN32
+	if (movie_capture_kind != MOVIE_CAP_AVI && movie_capture_kind != MOVIE_CAP_RAW && movie_capture_kind != MOVIE_CAP_ENCODE)
+#else
 	if (movie_capture_kind != MOVIE_CAP_ENCODE)
+#endif
 		return;
 
 	/* Flush early if a long hitch made host_frametime*speed larger than our staging window. */
@@ -518,7 +730,11 @@ qboolean Movie_GetSoundtime (void)
 {
 	if (!Movie_IsActive ())
 		return false;
+#ifdef _WIN32
+	if (movie_capture_kind != MOVIE_CAP_AVI && movie_capture_kind != MOVIE_CAP_RAW && movie_capture_kind != MOVIE_CAP_ENCODE)
+#else
 	if (movie_capture_kind != MOVIE_CAP_ENCODE)
+#endif
 		return false;
 
 	soundtime += Movie_AdvanceCaptureAudioSync ();
