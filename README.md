@@ -1,41 +1,4 @@
-﻿## JoeQuake SDL Linux fork
-
-This is a fork of
-[Joe's JoeQuake repository](https://github.com/j0zzz/JoeQuake), the speedrunning
-focused Quake engine.  It adds files to allow building the SDL version of
-JoeQuake on Linux.  To build first install dependencies:
-
-```bash
-# For Ubuntu users
-sudo apt-get update
-sudo apt-get install cmake build-essential libz-dev libsdl2-dev libjpeg-dev libgl1-mesa-dev libpng-dev libcurl4-openssl-dev
-```
-```bash
-# For Arch users
-sudo pacman -Syu base-devel cmake zlib sdl2 libjpeg-turbo mesa libpng curl
-```
-
-...and then run the following from the repository root:
-```bash
-mkdir build
-cd build
-cmake ..
-make
-# binary is written to `<repo root>/build/trunk/joequake-gl`
-```
-
-Further documentation:
-- [Guide for SDL specific JoeQuake features](SDL.md)
-
-
-This branch is heavily based on
-[Sphere's Linux fork of JoeQuake](https://github.com/kugelrund/JoeQuake/tree/linux).
-
-The original JoeQuake README is below.
-
----
-
-## Description
+﻿## Description
 
 JoeQuake is a custom Quake engine designed exclusively for speedrunning.  
 It was originated from the official id software [GLQuake source code](https://github.com/id-Software/Quake).
@@ -61,15 +24,37 @@ You can download JoeQuake Windows (x86) releases here:
 
 http://joequake.runecentral.com/downloads.html
 
+To build, use Visual Studio 2022 or 2026 with the v143 build tools. GL headers from khronos.org also need to be installed
+in your include path.
+
 ### Linux
 
-Unfortunately this main fork does not provide any Linux binaries.
-You may compile your own Linux binaries from the following JoeQuake 
-contributors (look for linux related branches):
+Now including the files to build a Linux binary in the main repository.
 
-https://github.com/kugelrund/JoeQuake
+```bash
+# For Ubuntu users
+sudo apt-get update
+sudo apt-get install cmake build-essential libz-dev libsdl2-dev libjpeg-dev libgl1-mesa-dev libpng-dev libcurl4-openssl-dev
+```
+```bash
+# For Arch users
+sudo pacman -Syu base-devel cmake zlib sdl2 libjpeg-turbo mesa libpng curl
+```
 
-https://github.com/matthewearl/JoeQuake-1
+...and then run the following from the repository root:
+```bash
+mkdir build
+cd build
+cmake ..
+make
+# binary is written to `<repo root>/build/trunk/joequake-gl`
+```
+
+Further documentation:
+- [Guide for SDL specific JoeQuake features](SDL.md)
+
+This branch is heavily based on
+[Sphere's Linux fork of JoeQuake](https://github.com/kugelrund/JoeQuake/tree/linux).
 
 ## License and Warranty
 
@@ -83,10 +68,10 @@ You may freely redistribute or modify JoeQuake as you wish.
 * Jozsef Szalontai - lead programmer
 * Sphere - server/client bugfixes, several QoL improvements
 * Matthew Earl - entire ghost recording feature, SDL port
-* Karol Urbański - vorbis/mp3 cross-platform support, bhop practice display, SDA demo browser
+* Karol Urbański - vorbis/mp3 cross-platform support, bhop practice + research tools, SDA demo browser, Linux ffmpeg capturing (and Windows ffmpeg capture fixes)
 * Philipp Kölmel - complete path tracer feature
 * Cymx - allow unfinished autodemos to be saved
-* Jntr - print entity information in freefly mode
+* Jntr - print entity information in freefly mode, fixes to video capture as a whole, Windows ffmpeg capturing
 * Emil Gestsson - player velocity calculation improvement during demo playback
 
 ### Authors whose code was re-used in JoeQuake
