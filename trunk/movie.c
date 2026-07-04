@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "movie.h"
 
 #ifdef _WIN32
+#include "movie_avi.h"
 #include "movie_ffmpeg.h"
 #else
 #include "movie_ff-linux.h"
@@ -60,17 +61,21 @@ int movie_frame_count;
 static qboolean OnChange_capture_dir (cvar_t *var, char *string);
 cvar_t	capture_dir	= {"capture_dir", "capture", 0, OnChange_capture_dir};
 cvar_t	capture_fps	= {"capture_fps", "30"};
-/*cvar_t	capture_codec	= {"capture_codec", "0"};
+#ifdef _WIN32
+cvar_t	capture_codec	= {"capture_codec", "0"};
 cvar_t	capture_mp3	= {"capture_mp3", "0"};
 cvar_t	capture_mp3_kbps = {"capture_mp3_kbps", "128"};
-cvar_t	capture_avi = {"capture_avi", "1"}; */
+cvar_t	capture_avi = {"capture_avi", "1"};
 /* legacy = AVI or TGA (see capture_avi); raw = *_ffmpeg_*.raw|pcm; ffmpeg = pipe to ffmpeg.exe -> stem.mp4 (Win32) */
-/*cvar_t	capture_mode = {"capture_mode", "legacy"};*/
+cvar_t	capture_mode = {"capture_mode", "legacy"};
+#endif
 /* If non-zero, queue a 'quit' after a capture finishes (manual stop, demo end, or encode abort). */
 cvar_t	capture_autoquit = {"capture_autoquit", "0"};
 cvar_t	capture_console	= {"capture_console", "1"};
+#ifdef _WIN32
 cvar_t	capture_ffmpeg_video_buf_mb     = {"capture_ffmpeg_video_buf_mb", "32"};
 cvar_t	capture_ffmpeg_audio_buf_mb     = {"capture_ffmpeg_audio_buf_mb", "4"};
+#endif
 cvar_t	capture_ffmpeg_loglevel         = {"capture_ffmpeg_loglevel", "error"};
 cvar_t	capture_ffmpeg_report           = {"capture_ffmpeg_report", "0"};
 cvar_t	capture_ffmpeg_write_timeout_ms = {"capture_ffmpeg_write_timeout_ms", "5000"};
@@ -371,8 +376,10 @@ void Movie_Init (void)
 	Cvar_Register (&capture_dir);
 	Cvar_Register (&capture_console);
 	Cvar_Register (&capture_autoquit);
+#ifdef _WIN32
 	Cvar_Register (&capture_ffmpeg_video_buf_mb);
 	Cvar_Register (&capture_ffmpeg_audio_buf_mb);
+#endif
 	Cvar_Register (&capture_ffmpeg_loglevel);
 	Cvar_Register (&capture_ffmpeg_report);
 	Cvar_Register (&capture_ffmpeg_write_timeout_ms);
@@ -380,12 +387,14 @@ void Movie_Init (void)
 	Cvar_Register (&capture_ffmpeg_video_args);
 	Cvar_Register (&capture_ffmpeg_audio_args);
 
-	/*ACM_LoadLibrary ();
+#ifdef _WIN32
+	ACM_LoadLibrary ();
 	if (acm_loaded)
 	{
 		Cvar_Register (&capture_mp3);
 		Cvar_Register (&capture_mp3_kbps);
-	}*/
+	}
+#endif
 }
 
 void Movie_StopPlayback (void)
