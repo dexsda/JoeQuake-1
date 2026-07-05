@@ -66,12 +66,12 @@ You may freely redistribute or modify JoeQuake as you wish.
 ### Contributors
 
 * Jozsef Szalontai - lead programmer
-* Sphere - server/client bugfixes, several QoL improvements
-* Matthew Earl - entire ghost recording feature, SDL port
-* Karol Urbański - vorbis/mp3 cross-platform support, bhop practice + research tools, SDA demo browser, Linux ffmpeg capturing (and Windows ffmpeg capture fixes)
+* [Karol Urbański](https://github.com/dexsda) - lead Linux maintainer; cross platform bgm & ffmpeg capture, research tools, SDA demo browser
+* Sphere - server/client bugfixes, several QoL improvements, initial Linux port
+* Matthew Earl - entire ghost recording feature, SDL & Linux port
 * Philipp Kölmel - complete path tracer feature
 * Cymx - allow unfinished autodemos to be saved
-* Jntr - print entity information in freefly mode, fixes to video capture as a whole, Windows ffmpeg capturing
+* Jntr - print entity information in freefly mode, fixes to video capture bugs, Windows ffmpeg capturing
 * Emil Gestsson - player velocity calculation improvement during demo playback
 
 ### Authors whose code was re-used in JoeQuake
