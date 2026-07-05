@@ -442,18 +442,7 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 
 		/* Halving fallback if the requested size exceeds the per-pipe quota on a
 		   constrained machine. Floor at 1 MB so a working pipe is always created. */
-		m_hAudioPipe = CreateNamedPipeA (
-			pipename_audio,
-			PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-			PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-			1,
-			abuf,
-			abuf,
-			0,
-			&sa);
-		while (m_hAudioPipe == INVALID_HANDLE_VALUE && abuf > 1 * 1024 * 1024)
-		{
-			abuf /= 2;
+		do {
 			m_hAudioPipe = CreateNamedPipeA (
 				pipename_audio,
 				PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
@@ -462,32 +451,22 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 				abuf,
 				abuf,
 				0,
-				&sa);
-		}
+				&sa
+			);
+			abuf >>= 1;
+		} while (m_hAudioPipe == INVALID_HANDLE_VALUE && abuf > 1 * 1024 * 1024);
+
 		if (m_hAudioPipe == INVALID_HANDLE_VALUE)
 		{
 			Con_Printf ("ERROR: CreateNamedPipe (audio) failed (%lu)\n", (unsigned long) GetLastError ());
-			CloseHandle (m_hStderrLog);
-			m_hStderrLog = INVALID_HANDLE_VALUE;
-			return false;
+			goto error_cleanup_stderr;
 		}
 	}
 
 	{
 		DWORD vbuf = (DWORD) bound (1, capture_ffmpeg_video_buf_mb.value, 256) * 1024 * 1024;
 
-		m_hVideoPipe = CreateNamedPipeA (
-			pipename_video,
-			PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-			PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-			1,
-			vbuf,
-			vbuf,
-			0,
-			&sa);
-		while (m_hVideoPipe == INVALID_HANDLE_VALUE && vbuf > 1 * 1024 * 1024)
-		{
-			vbuf /= 2;
+		do {
 			m_hVideoPipe = CreateNamedPipeA (
 				pipename_video,
 				PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
@@ -496,16 +475,17 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 				vbuf,
 				vbuf,
 				0,
-				&sa);
-		}
+				&sa
+			);
+			vbuf >>= 1;
+		} while (m_hVideoPipe == INVALID_HANDLE_VALUE && vbuf > 1 * 1024 * 1024)
+
 		if (m_hVideoPipe == INVALID_HANDLE_VALUE)
 		{
 			Con_Printf ("ERROR: CreateNamedPipe (video) failed (%lu)\n", (unsigned long) GetLastError ());
 			CloseHandle (m_hAudioPipe);
 			m_hAudioPipe = INVALID_HANDLE_VALUE;
-			CloseHandle (m_hStderrLog);
-			m_hStderrLog = INVALID_HANDLE_VALUE;
-			return false;
+			goto error_cleanup_stderr;
 		}
 	}
 
@@ -542,14 +522,13 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 		&sa,
 		OPEN_EXISTING,
 		0,
-		NULL);
+		NULL
+	);
+
 	if (hNulIn == INVALID_HANDLE_VALUE)
 	{
 		Con_Printf ("ERROR: could not open NUL for ffmpeg stdin\n");
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_pipes;
 	}
 
 	{
@@ -568,11 +547,7 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 				"ERROR: capture_ffmpeg_video_args or capture_ffmpeg_audio_args "
 				"exceed %u characters (trimmed)\n",
 				(unsigned) (CAP_FFMPEG_ENCODE_ARG_CAP - 1));
-			CloseHandle (hNulIn);
-			Movie_FFmpeg_Encode_ClosePipes ();
-			CloseHandle (m_hStderrLog);
-			m_hStderrLog = INVALID_HANDLE_VALUE;
-			return false;
+			goto error_cleanup_handles;
 		}
 
 		Q_snprintfz (
@@ -583,18 +558,12 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 			"-f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d "
 			"-thread_queue_size 1024 -i %s "
 			"-map 0:a -map 1:v -vf vflip -shortest %s %s \"%s\"",
-			ffmpeg_exe,
-			loglevel,
-			report,
-			sample_rate,
-			pipename_audio,
-			width,
-			height,
-			fps,
+			ffmpeg_exe, loglevel, report,
+			sample_rate, pipename_audio,
+			width, height, fps,
 			pipename_video,
-			venc_args,
-			aenc_args,
-			outpath);
+			venc_args, aenc_args, outpath
+		);
 	}
 
 	memset (&siex, 0, sizeof (siex));
@@ -615,22 +584,13 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 	if (!attrlist)
 	{
 		Con_Printf ("ERROR: HeapAlloc for attribute list failed\n");
-		CloseHandle (hNulIn);
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_handles;
 	}
 
 	if (!InitializeProcThreadAttributeList (attrlist, 1, 0, &attrlist_size))
 	{
 		Con_Printf ("ERROR: InitializeProcThreadAttributeList failed (%lu)\n", (unsigned long) GetLastError ());
-		HeapFree (GetProcessHeap (), 0, attrlist);
-		CloseHandle (hNulIn);
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_heap;
 	}
 
 	inherit_handles[0] = hNulIn;
@@ -645,13 +605,7 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 		    NULL))
 	{
 		Con_Printf ("ERROR: UpdateProcThreadAttribute failed (%lu)\n", (unsigned long) GetLastError ());
-		DeleteProcThreadAttributeList (attrlist);
-		HeapFree (GetProcessHeap (), 0, attrlist);
-		CloseHandle (hNulIn);
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_thread;
 	}
 
 	siex.lpAttributeList = attrlist;
@@ -659,25 +613,20 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 	memset (&pi, 0, sizeof (pi));
 
 	if (!CreateProcessA (
-		    ffmpeg_exe,
-		    cmdline,
-		    NULL,
-		    NULL,
-		    TRUE,
-		    EXTENDED_STARTUPINFO_PRESENT,
-		    NULL,
-		    com_basedir,
-		    &siex.StartupInfo,
-		    &pi))
+		ffmpeg_exe,
+		cmdline,
+		NULL,
+		NULL,
+		TRUE,
+		EXTENDED_STARTUPINFO_PRESENT,
+		NULL,
+		com_basedir,
+		&siex.StartupInfo,
+		&pi
+	))
 	{
 		Con_Printf ("ERROR: CreateProcess ffmpeg failed (%lu)\n", (unsigned long) GetLastError ());
-		DeleteProcThreadAttributeList (attrlist);
-		HeapFree (GetProcessHeap (), 0, attrlist);
-		CloseHandle (hNulIn);
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_thread;
 	}
 
 	DeleteProcThreadAttributeList (attrlist);
@@ -692,27 +641,13 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 	if (!ConnectNamedPipe (m_hAudioPipe, NULL) && GetLastError () != ERROR_PIPE_CONNECTED)
 	{
 		Con_Printf ("ERROR: ConnectNamedPipe (audio) failed (%lu)\n", (unsigned long) GetLastError ());
-		TerminateProcess (m_hFfmpegProc, 1);
-		WaitForSingleObject (m_hFfmpegProc, 5000);
-		CloseHandle (m_hFfmpegProc);
-		m_hFfmpegProc = NULL;
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_ffmpeg;
 	}
 
 	if (!ConnectNamedPipe (m_hVideoPipe, NULL) && GetLastError () != ERROR_PIPE_CONNECTED)
 	{
 		Con_Printf ("ERROR: ConnectNamedPipe (video) failed (%lu)\n", (unsigned long) GetLastError ());
-		TerminateProcess (m_hFfmpegProc, 1);
-		WaitForSingleObject (m_hFfmpegProc, 5000);
-		CloseHandle (m_hFfmpegProc);
-		m_hFfmpegProc = NULL;
-		Movie_FFmpeg_Encode_ClosePipes ();
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
+		goto error_cleanup_ffmpeg;
 	}
 
 	m_sink_mode = FFMPEG_SINK_ENCODE;
@@ -723,6 +658,27 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 	Con_Printf ("capture_mode ffmpeg: %s\n", cmdline);
 	Con_Printf ("capture_mode ffmpeg: output %s\n", outpath);
 	return true;
+
+	/* gotos are the best method of error handling, see linux kernel code style */
+error_cleanup_ffmpeg:
+	TerminateProcess (m_hFfmpegProc, 1);
+	WaitForSingleObject (m_hFfmpegProc, 5000);
+	CloseHandle (m_hFfmpegProc);
+	m_hFfmpegProc = NULL;
+	goto error_cleanup_pipes;
+
+error_cleanup_thread:
+	DeleteProcThreadAttributeList (attrlist);
+error_cleanup_heap:
+	HeapFree (GetProcessHeap (), 0, attrlist);
+error_cleanup_handles:
+	CloseHandle (hNulIn);
+error_cleanup_pipes:
+	Movie_FFmpeg_Encode_ClosePipes ();
+error_cleanup_stderr:
+	CloseHandle (m_hStderrLog);
+	m_hStderrLog = INVALID_HANDLE_VALUE;
+	return false;
 }
 
 qboolean Movie_FFmpeg_Open (const char *dir, const char *stem)
