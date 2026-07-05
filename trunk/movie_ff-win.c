@@ -364,7 +364,8 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 	char				outpath[MAX_OSPATH];
 	char				pipename_audio[128];
 	char				pipename_video[128];
-	char				cmdline[16384];
+	char				cmdline_audio[16384];
+	char				cmdline_video[16384];
 	char				venc_args[CAP_FFMPEG_ENCODE_ARG_CAP];
 	char				aenc_args[CAP_FFMPEG_ENCODE_ARG_CAP];
 	HANDLE				hNulIn = INVALID_HANDLE_VALUE;
@@ -478,7 +479,7 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 				&sa
 			);
 			vbuf >>= 1;
-		} while (m_hVideoPipe == INVALID_HANDLE_VALUE && vbuf > 1 * 1024 * 1024)
+		} while (m_hVideoPipe == INVALID_HANDLE_VALUE && vbuf > 1 * 1024 * 1024);
 
 		if (m_hVideoPipe == INVALID_HANDLE_VALUE)
 		{
@@ -487,32 +488,6 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 			m_hAudioPipe = INVALID_HANDLE_VALUE;
 			goto error_cleanup_stderr;
 		}
-	}
-
-	memset (&m_video_ovl, 0, sizeof (m_video_ovl));
-	memset (&m_audio_ovl, 0, sizeof (m_audio_ovl));
-	m_audio_ovl.hEvent = CreateEvent (NULL, TRUE, FALSE, NULL);
-	m_video_ovl.hEvent = CreateEvent (NULL, TRUE, FALSE, NULL);
-	if (!m_audio_ovl.hEvent || !m_video_ovl.hEvent)
-	{
-		Con_Printf ("ERROR: CreateEvent for overlapped pipe I/O failed (%lu)\n", (unsigned long) GetLastError ());
-		if (m_audio_ovl.hEvent)
-		{
-			CloseHandle (m_audio_ovl.hEvent);
-			m_audio_ovl.hEvent = NULL;
-		}
-		if (m_video_ovl.hEvent)
-		{
-			CloseHandle (m_video_ovl.hEvent);
-			m_video_ovl.hEvent = NULL;
-		}
-		CloseHandle (m_hVideoPipe);
-		m_hVideoPipe = INVALID_HANDLE_VALUE;
-		CloseHandle (m_hAudioPipe);
-		m_hAudioPipe = INVALID_HANDLE_VALUE;
-		CloseHandle (m_hStderrLog);
-		m_hStderrLog = INVALID_HANDLE_VALUE;
-		return false;
 	}
 
 	hNulIn = CreateFileA (
@@ -551,18 +526,27 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 		}
 
 		Q_snprintfz (
-			cmdline,
-			sizeof (cmdline),
+			cmdline_audio,
+			sizeof (cmdline_audio),
 			"\"%s\" -hide_banner -loglevel %s %s -y "
 			"-f s16le -ac 2 -ar %d -thread_queue_size 1024 -i %s "
-			"-f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d "
-			"-thread_queue_size 1024 -i %s "
-			"-map 0:a -map 1:v -vf vflip -shortest %s %s \"%s\"",
+			"-map 0:a -shortest %s \"%s\"",
 			ffmpeg_exe, loglevel, report,
 			sample_rate, pipename_audio,
+			aenc_args, outpath
+		);
+
+		Q_snprintfz (
+			cmdline_audio,
+			sizeof (cmdline_audio),
+			"\"%s\" -hide_banner -loglevel %s %s -y "
+			"-f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d "
+			"-thread_queue_size 1024 -i %s "
+			"-map 0:v -vf vflip -shortest %s \"%s\"",
+			ffmpeg_exe, loglevel, report,
 			width, height, fps,
 			pipename_video,
-			venc_args, aenc_args, outpath
+			venc_args, outpath
 		);
 	}
 
