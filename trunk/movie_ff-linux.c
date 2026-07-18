@@ -73,6 +73,7 @@ char ** Movie_FFmpeg_Args(char * cmd)
 	 * looks like. don't use that dumb standard lib function */
 	char * s = cmd, *e = cmd, *q, *r;
 	int i = 0;
+	int quoted = 0;
 
 	while (*e != '\0')
 		e++;
@@ -85,12 +86,26 @@ char ** Movie_FFmpeg_Args(char * cmd)
 		if (q == e)
 			break;
 
+		if (*q == '"')
+			quoted = 1;
+
 		r = q;
-		while (*r != ' ' && *r != '\0')
+		if (!quoted) {
+			while (*r != ' ' && *r != '\0')
+				r++;
+		} else {
 			r++;
+			while (*r != '"' && *r != '\0')
+				r++;
+		}
 
 		argv[i] = Q_calloc(MOVIE_ARGLEN, sizeof(char));
-		Q_strncpy(argv[i], q, r - q);
+		Q_strncpy(argv[i], q + quoted, r - q - quoted);
+
+		if (quoted) {
+			r++;
+			quoted = 0;
+		}
 
 		q = r;
 		i++;
@@ -164,8 +179,8 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 			Q_snprintfz(
 				cmdline, sizeof(cmdline),
 				"ffmpeg -hide_banner -loglevel error -report -y "
-				"-f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d -thread_queue_size 1024 -i %s "
-				"-map 0:v -vf vflip -shortest %s %s",
+				"-f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d -i %s "
+				"-map 0:v -vf vflip -shortest %s \"%s\"",
 				width, height, fps, pipename_video,
 				capture_ffmpeg_video_args.string, outpath_video
 			);
@@ -186,8 +201,8 @@ qboolean Movie_FFmpeg_Encode_Open (const char *dir, const char *stem, int width,
 			Q_snprintfz(
 				cmdline, sizeof(cmdline),
 				"ffmpeg -hide_banner -loglevel error -report -y "
-				"-f s16le -ac 2 -ar %d -thread_queue_size 1024 -i %s "
-				"-map 0:a %s %s",
+				"-f s16le -ac 2 -ar %d -i %s "
+				"-map 0:a %s \"%s\"",
 				sample_rate, pipename_audio,
 				capture_ffmpeg_audio_args.string, outpath_audio
 			);
@@ -269,7 +284,7 @@ void Movie_FFmpeg_Close (void)
 			return;
 		case 0:
 			Q_snprintfz(cmdline, sizeof(cmdline), 
-				"ffmpeg -y -i %s -i %s -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 %s",
+				"ffmpeg -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 \"%s\"",
 				outpath_video, outpath_audio, outpath_combined
 			);
 

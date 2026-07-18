@@ -39,7 +39,7 @@ typedef struct piped_process_s {
 } piped_process_t;
 
 piped_process_t * ffmpeg_create_piped_process(char * ffmpeg_path, char * ffmpeg_args, char * ffmpeg_dir, pipe_status_t * pipe_status);
-void ffmpeg_destruct_piped_process(piped_process_t process);
+void ffmpeg_destruct_piped_process(piped_process_t * process);
 qboolean ffmpeg_create_pipe_pair(const char* name, HANDLE* out_read_pipe, HANDLE* out_write_pipe, DWORD buffer_size, DWORD timeout_ms);
 pipe_status_t * ffmpeg_write_to_piped_process(piped_process_t * process, const char * data, size_t len);
 void ffmpeg_close_piped_process(piped_process_t * process, qboolean terminate);
