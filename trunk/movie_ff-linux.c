@@ -10,25 +10,6 @@ Requirements for capture_mode ffmpeg:
 
 Video: packed RGB24, GL framebuffer row order (bottom row first). ffmpeg gets -vf vflip.
 Audio: interleaved stereo s16le at sample_rate Hz (engine shm->speed).
-
-Encode: two named OUTBOUND pipes (audio then rawvideo). Child stdin is NUL — avoids
-stdin/rawvideo coupling and tiny anonymous pipe stalls. CLI lists -i audio pipe before
--i video pipe; ConnectNamedPipe order matches. Failed writes abort capture once.
-No +faststart (avoids post-mux rewrite stalls on pipe shutdown).
-
-CreateProcess uses STARTUPINFOEX + PROC_THREAD_ATTRIBUTE_HANDLE_LIST to whitelist
-exactly the stdio handles (NUL stdin, stderr log) for inheritance. The pipe SERVER
-handles are created with bInheritHandle=TRUE for the same SECURITY_ATTRIBUTES used
-by stdio, but the whitelist excludes them so ffmpeg.exe receives only its client
-side via CreateFile on the pipe path. Otherwise the inherited unused server handles
-in the child keep the pipe alive after the parent CloseHandle, the client read
-never sees EOF, and the muxer never finalizes the MP4.
-
-Finalize wait: Movie_FFmpeg_WaitOrKillProcess polls in 100 ms slices and pumps
-Sys_SendKeyEvents + SCR_UpdateScreen each iteration so the window stays painted
-and Windows does not declare the game unresponsive while ffmpeg writes the moov.
-m_finalizing is exposed via Movie_FFmpeg_IsFinalizing so movie.c can refuse new
-captures during the wait.
 */
 
 #include "quakedef.h"
