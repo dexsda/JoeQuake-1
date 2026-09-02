@@ -81,7 +81,7 @@ cvar_t	capture_ffmpeg_write_timeout_ms = {"capture_ffmpeg_write_timeout_ms", "50
 cvar_t	capture_ffmpeg_loglevel         = {"capture_ffmpeg_loglevel", "error"};
 cvar_t	capture_ffmpeg_report           = {"capture_ffmpeg_report", "0"};
 cvar_t	capture_ffmpeg_container        = {"capture_ffmpeg_container", "mp4"};
-cvar_t	capture_ffmpeg_video_args       = {"capture_ffmpeg_video_args", "-c:v libx265 -preset fast -crf 18 -pix_fmt yuv420p"};
+cvar_t	capture_ffmpeg_video_args       = {"capture_ffmpeg_video_args", "-c:v libx264 -preset fast -crf 13 -pix_fmt yuv420p"};
 cvar_t	capture_ffmpeg_audio_args       = {"capture_ffmpeg_audio_args", "-c:a aac -b:a 256k -ar 48000"};
 
 static qboolean movie_is_capturing = false;
@@ -483,6 +483,23 @@ void Movie_CaptureDemo_f (void)
 		char buf[128];
 		Q_snprintfz(buf, sizeof(buf) - 1, "wait; wait; wait; wait; wait; wait; wait; capturedemo %s\n", Cmd_Argv(1));
 		Cbuf_AddText (buf);
+		return;
+	}
+#else 
+	int w, h;
+#ifdef GLQUAKE
+	w = glwidth;
+	h = glheight;
+#else
+	w = vid.width;
+	h = vid.height;
+#endif
+
+	if (w <= 0 || h <= 0 || shm->speed <= 0) {
+		Con_Printf("Still initializing system...\n");
+		char buf[128];
+		Q_snprintfz(buf, sizeof(buf) - 1, "wait; wait; wait; wait; wait; wait; wait; capturedemo %s\n", Cmd_Argv(1));
+		Cbuf_AddText(buf);
 		return;
 	}
 #endif
