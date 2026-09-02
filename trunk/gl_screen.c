@@ -1381,6 +1381,7 @@ void SCR_UpdateScreen (void)
 			SCR_DrawBHOP ();
 		Ghost_DrawGhostTime (false);
 		SCR_DrawStats ();
+		SCR_DrawAttemptCount ();
 		SCR_DrawVolume ();
 		SCR_DrawMovementKeys ();
 		SCR_DrawPlaybackStats ();

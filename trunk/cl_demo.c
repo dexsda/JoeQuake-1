@@ -447,6 +447,21 @@ void CL_Record_f (void)
 	else
 		Q_snprintfz (name, sizeof(name), "%s/%s", com_gamedir, Cmd_Argv(1));
 
+// count attempts if desired
+	if (show_attempts.value)
+	{ 
+		// guard against overflow; floats can safely store all 7 digit ints
+		if (attempt_count.value >= 9999999) 
+		{
+			Con_Printf("Reset attempt counter on attempt 10,000,000.\nYou should probably take a break...\n");
+			Cvar_SetValue(&attempt_count, 0);
+		}
+		else
+		{
+			Cvar_SetValue(&attempt_count, attempt_count.value + 1);
+		}
+	} 
+
 // start the map up
 	if (c > 2)
 	{

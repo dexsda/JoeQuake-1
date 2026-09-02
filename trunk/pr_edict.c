@@ -1234,6 +1234,53 @@ void PR_LoadProgs (void)
 	PR_PatchRereleaseBuiltins();
 }
 
+void CL_SecretHint_f (void)
+{
+	float min = 99999999.0;
+	int i;
+	edict_t *ed = NULL;
+	char * field;
+	if (cls.state != ca_connected || cls.demorecording) 
+		return;
+
+	for (i = 1; i < sv.num_edicts; i++)
+	{
+		ed = EDICT_NUM(i);
+
+		field = GETEDICTFIELDNAME(ed, "classname");
+
+		if (strlen(field) == 0)
+			continue;
+
+		if (Q_strcasecmp("trigger_secret", field) == 0)
+		{
+			vec3_t origin_secret;
+			float tmp_len;
+
+			VectorCopy(ed->v.absmin, origin_secret);
+			VectorAdd(origin_secret, ed->v.absmax, origin_secret);
+			VectorScale(origin_secret, 0.5, origin_secret);
+			VectorSubtract(origin_secret, sv_player->v.origin, origin_secret);
+
+			if ((tmp_len = VectorLength(origin_secret)) < min)
+				min = tmp_len;
+		}
+	}
+
+	// print result
+	float add = ((double)rand()/RAND_MAX)*0.2;
+	if (min > 99999990.0)
+		Con_Printf("secret hint: no secrets left\n");
+	else if (min * (0.9 + add) <= 256.0)
+		Con_Printf("secret hint: hot!\n");
+	else if (min * (0.9 + add) <= 768.0)
+		Con_Printf("secret hint: warm...\n");
+	else if (min * (0.9 + add) <= 2048.0)
+		Con_Printf("secret hint: room temperature\n");
+	else
+		Con_Printf("secret hint: cold\n");
+
+}
 
 /*
 ===============
@@ -1246,6 +1293,7 @@ void PR_Init (void)
 	Cmd_AddCommand ("edicts", ED_PrintEdicts);
 	Cmd_AddCommand ("edictcount", ED_Count);
 	Cmd_AddCommand ("profile", PR_Profile_f);
+	Cmd_AddCommand ("secrethint", CL_SecretHint_f);
 	Cvar_Register (&nomonsters);
 	Cvar_Register (&gamecfg);
 	Cvar_Register (&scratch1);
