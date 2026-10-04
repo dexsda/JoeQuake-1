@@ -646,7 +646,7 @@ void Movie_FFmpeg_Close (void)
 			return;
 		};
 
-		WaitForSingleObject(pi.hProcess, 10000);
+		WaitForSingleObject(pi.hProcess, 60000);
 		GetExitCodeProcess(pi.hProcess, &wexit);
 
 		if (wexit != 0)
