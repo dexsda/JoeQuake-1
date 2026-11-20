@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
+#include <synchapi.h>
 
 extern void Movie_Stop (void);
 extern void Movie_MaybeAutoQuit (void);
@@ -672,6 +673,7 @@ void Movie_FFmpeg_Close (void)
 			Con_Printf("Muxin...\n");
 			Sys_SendKeyEvents ();
 			SCR_UpdateScreen();
+            Sleep(10);
 		}
 
 		GetExitCodeProcess(pi.hProcess, &wexit);
