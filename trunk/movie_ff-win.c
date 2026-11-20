@@ -703,7 +703,7 @@ void Movie_FFmpeg_Close (void)
 		};
 
 		CHAR chBuf[1024]; 
-		DWORD dwRead, dwWritten; 
+		DWORD dwRead; 
 		BOOL bSuccess = FALSE;
 		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
 
