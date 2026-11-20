@@ -701,22 +701,28 @@ void Movie_FFmpeg_Close (void)
 			return;
 		};
 
+		qboolean mux_done = false;
 		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
 			Con_Printf("here 1");
 			Sys_SendKeyEvents();
 			SCR_UpdateScreen();
-			bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, 1024, &dwRead, NULL);
-			chBuf[dwRead] = '\0';
-			Con_Printf("here 2");
-			Sys_SendKeyEvents();
-			SCR_UpdateScreen();
+			if (!mux_done) {
+				bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, 1024, &dwRead, NULL);
+				chBuf[dwRead] = '\0';
+				Con_Printf("here 2");
+				Sys_SendKeyEvents();
+				SCR_UpdateScreen();
 
-			if (dwRead > 0)
-				parse_out_time(chBuf);
+				if (dwRead > 0) {
+					if (Q_strcasestr(txt, "progress=end")) 
+						mux_done = true;
+					parse_out_time(chBuf);
+				}
 
-			Con_Printf("here 3");
-			Sys_SendKeyEvents();
-			SCR_UpdateScreen();
+				Con_Printf("here 3");
+				Sys_SendKeyEvents();
+				SCR_UpdateScreen();
+			}
 		}
 
 		if (waitret != WAIT_OBJECT_0)
