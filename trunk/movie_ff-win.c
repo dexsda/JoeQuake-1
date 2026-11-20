@@ -714,7 +714,7 @@ void Movie_FFmpeg_Close (void)
 				SCR_UpdateScreen();
 
 				if (dwRead > 0) {
-					if (Q_strcasestr(txt, "progress=end")) 
+					if (Q_strcasestr(chBuf, "progress=end") != NULL) 
 						mux_done = true;
 					parse_out_time(chBuf);
 				}
