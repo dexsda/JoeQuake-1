@@ -633,18 +633,6 @@ void parse_out_time(char * txt)
 	}
 }
 
-void parse_out_time(char * txt) 
-{
-	char * start, *end;
-	if ((start = Q_strcasestr(txt, "frame="))) {
-		if ((end = Q_strcasestr(start, "\n"))) {
-			*end = '\0';
-		}
-		double percent = 100.0 * atof(start+6) / (double) capture_frames;
-		Con_Printf("Mux progress: %s frames (%.1f%%)\n", start+6, percent);
-	}
-}
-
 void Movie_FFmpeg_Close (void)
 {
 	if (m_sink_mode == FFMPEG_SINK_ENCODE)
