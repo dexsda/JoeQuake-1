@@ -38,6 +38,8 @@
 #include <string.h>
 #include <windows.h>
 #include <synchapi.h>
+#include <tchar.h>
+#include <strsafe.h>
 
 extern void Movie_Stop (void);
 extern void Movie_MaybeAutoQuit (void);
@@ -640,6 +642,41 @@ void Movie_FFmpeg_Close (void)
 		DWORD       waitret;
 		PROCESS_INFORMATION		pi;
 		STARTUPINFO si;
+		SECURITY_ATTRIBUTES saAttr; 
+
+		// Set the bInheritHandle flag so pipe handles are inherited. 
+
+		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+		saAttr.bInheritHandle = TRUE; 
+		saAttr.lpSecurityDescriptor = NULL; 
+
+		HANDLE g_hChildStd_IN_Rd = NULL;
+		HANDLE g_hChildStd_IN_Wr = NULL;
+		HANDLE g_hChildStd_OUT_Rd = NULL;
+		HANDLE g_hChildStd_OUT_Wr = NULL;
+		if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
+			ErrorExit(TEXT("StdoutRd CreatePipe")); 
+
+// Ensure the read handle to the pipe for STDOUT is not inherited.
+
+		if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
+			ErrorExit(TEXT("Stdout SetHandleInformation")); 
+
+// Create a pipe for the child process's STDIN. 
+ 
+		if (! CreatePipe(&g_hChildStd_IN_Rd, &g_hChildStd_IN_Wr, &saAttr, 0)) 
+			ErrorExit(TEXT("Stdin CreatePipe")); 
+
+// Ensure the write handle to the pipe for STDIN is not inherited. 
+ 
+		if ( ! SetHandleInformation(g_hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0) )
+			ErrorExit(TEXT("Stdin SetHandleInformation")); 
+
+		si.cb = sizeof(STARTUPINFO); 
+		si.hStdError = g_hChildStd_OUT_Wr;
+		si.hStdOutput = g_hChildStd_OUT_Wr;
+		si.hStdInput = g_hChildStd_IN_Rd;
+   siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 		Movie_FFmpeg_Encode_ClosePipes ();
 		Con_Printf("Muxing video with %d frames, don't quit until it's done...\n", capture_frames);
 
@@ -669,14 +706,26 @@ void Movie_FFmpeg_Close (void)
 			return;
 		};
 
+		CHAR chBuf[BUFSIZE]; 
+		DWORD dwRead, dwWritten; 
+		BOOL bSuccess = FALSE;
 		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
+
+			bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+			chBuf[dwRead] = '\0';
+
 			Con_Printf("Muxin...\n");
+			Con_Printf("%s\n", chBuf);
 			Sys_SendKeyEvents ();
 			SCR_UpdateScreen();
+
             Sleep(10);
 		}
 
 		GetExitCodeProcess(pi.hProcess, &wexit);
+
+		CloseHandle(g_hChildStd_OUT_Wr);
+		CloseHandle(g_hChildStd_IN_Rd);
 
 		if (wexit != 0)
 			Con_Printf("ERROR: Mux ffmpeg didn't quit properly (exit code %ld)\n", wexit);
