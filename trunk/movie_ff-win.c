@@ -654,29 +654,25 @@ void Movie_FFmpeg_Close (void)
 		HANDLE g_hChildStd_IN_Wr = NULL;
 		HANDLE g_hChildStd_OUT_Rd = NULL;
 		HANDLE g_hChildStd_OUT_Wr = NULL;
-		if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
-			ErrorExit(TEXT("StdoutRd CreatePipe")); 
+		CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0);
 
 // Ensure the read handle to the pipe for STDOUT is not inherited.
 
-		if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
-			ErrorExit(TEXT("Stdout SetHandleInformation")); 
+		SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0);
 
 // Create a pipe for the child process's STDIN. 
  
-		if (! CreatePipe(&g_hChildStd_IN_Rd, &g_hChildStd_IN_Wr, &saAttr, 0)) 
-			ErrorExit(TEXT("Stdin CreatePipe")); 
+		CreatePipe(&g_hChildStd_IN_Rd, &g_hChildStd_IN_Wr, &saAttr, 0); 
 
 // Ensure the write handle to the pipe for STDIN is not inherited. 
  
-		if ( ! SetHandleInformation(g_hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0) )
-			ErrorExit(TEXT("Stdin SetHandleInformation")); 
+		SetHandleInformation(g_hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0); 
 
 		si.cb = sizeof(STARTUPINFO); 
 		si.hStdError = g_hChildStd_OUT_Wr;
 		si.hStdOutput = g_hChildStd_OUT_Wr;
 		si.hStdInput = g_hChildStd_IN_Rd;
-   siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+		si.dwFlags |= STARTF_USESTDHANDLES;
 		Movie_FFmpeg_Encode_ClosePipes ();
 		Con_Printf("Muxing video with %d frames, don't quit until it's done...\n", capture_frames);
 
