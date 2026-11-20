@@ -682,7 +682,7 @@ void Movie_FFmpeg_Close (void)
 		CL_Disconnect();
 
 		Q_snprintfz(cmdline, sizeof(cmdline),
-			"\"%s\" -y -i \"%s\" -i \"%s\" -c:v libx264 -c:a copy -map 0:v:0 -map 1:a:0 -loglevel quiet -hide_banner -progress pipe:1 \"%s\"",
+			"\"%s\" -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 -loglevel quiet -hide_banner -progress pipe:1 \"%s\"",
 			m_ffmpeg_exe, m_outpath_video, m_outpath_audio, m_outpath
 		);
 		if (!CreateProcessA(
