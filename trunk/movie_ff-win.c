@@ -651,6 +651,8 @@ void Movie_FFmpeg_Close (void)
 		DWORD dwRead; 
 		BOOL bSuccess = FALSE;
 
+		ZeroMemory( &si, sizeof(si) );
+		ZeroMemory( &pi, sizeof(pi) );
 		Movie_FFmpeg_Encode_ClosePipes ();
 
 		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
