@@ -702,12 +702,19 @@ void Movie_FFmpeg_Close (void)
 		};
 
 		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
+			Con_Printf("here 1");
+			Sys_SendKeyEvents();
+			SCR_UpdateScreen();
 			bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, 1024, &dwRead, NULL);
 			chBuf[dwRead] = '\0';
+			Con_Printf("here 2");
+			Sys_SendKeyEvents();
+			SCR_UpdateScreen();
 
 			if (dwRead > 0)
 				parse_out_time(chBuf);
 
+			Con_Printf("here 3");
 			Sys_SendKeyEvents();
 			SCR_UpdateScreen();
 		}
