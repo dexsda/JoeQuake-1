@@ -706,12 +706,12 @@ void Movie_FFmpeg_Close (void)
 			return;
 		};
 
-		CHAR chBuf[BUFSIZE]; 
+		CHAR chBuf[1024]; 
 		DWORD dwRead, dwWritten; 
 		BOOL bSuccess = FALSE;
 		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
 
-			bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+			bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, 1024, &dwRead, NULL);
 			chBuf[dwRead] = '\0';
 
 			Con_Printf("Muxin...\n");
