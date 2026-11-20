@@ -1447,8 +1447,8 @@ void SCR_UpdateScreen (void)
 		SCR_DrawMovementKeys ();
 		SCR_DrawPlaybackStats ();
 		Sbar_Draw ();
-        if(CL_TrackEdicts())
-            SCR_DrawEdictTracker();
+		if(CL_TrackEdicts())
+			SCR_DrawEdictTracker();
 		SCR_DrawConsole ();
 		M_Draw ();
 		DemoCam_DrawPos ();

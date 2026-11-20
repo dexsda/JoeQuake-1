@@ -45,7 +45,6 @@ static FILE			*m_ffmpeg_audio;
 static int           ffmpeg_pipe_video = 0;
 static int           ffmpeg_pipe_audio = 0;
 
-
 static char				outpath_combined[MAX_OSPATH];
 static char				outpath_video[MAX_OSPATH];
 static char				outpath_audio[MAX_OSPATH];
@@ -58,6 +57,7 @@ static double			m_finalize_seconds	= 0;
 static char				pipename_audio[128];
 static char				pipename_video[128];
 
+extern int capture_frames;
 /* the output from this function is always used in forked/execvp 
  * processes, so no need to worry about freeing the memory */
 #define MOVIE_ARGC 256 /* amount of args */
@@ -244,6 +244,28 @@ void Movie_FFmpeg_WriteAudio (int samples, const byte *sample_buffer)
 		Con_Printf ("ERROR: ffmpeg audio write %d bytes failed ERRNO %d\n", nbytes, errno);
 
 }
+int mux_status = 1;
+pid_t mux_pid;
+
+void clean_up_mux_process(int sig)
+{
+	int status;
+	waitpid(-1, &status, 0);
+	printf("Got status %d from child\n",status);
+	mux_status=0;
+}
+
+void parse_out_time(char * txt) 
+{
+	char * start, *end;
+	if ((start = Q_strcasestr(txt, "frame="))) {
+		if ((end = Q_strcasestr(start, "\n"))) {
+			*end = '\0';
+		}
+		double percent = 100.0 * atof(start+6) / (double) capture_frames;
+		Con_Printf("Mux progress: %s frames (%.1f%%)\n", start+6, percent);
+	}
+}
 
 void Movie_FFmpeg_Close (void)
 {
@@ -262,9 +284,12 @@ void Movie_FFmpeg_Close (void)
 	ffmpeg_pipe_audio = 0;
 	ffmpeg_pipe_video = 0;
 
-	SCR_EndLoadingPlaque();
-	Con_Printf("Muxing...\n");
+	Con_Printf("Muxing video with %d frames, don't quit until it's done...\n", capture_frames);
+	Sys_SendKeyEvents ();
+	SCR_UpdateScreen();
 
+	SCR_EndLoadingPlaque();
+	CL_Disconnect();
 	waitpid(0, &status, 0);
 	if (!WIFEXITED(status))
 		Con_Printf("Error quitting ffmpeg!\n");
@@ -275,13 +300,23 @@ void Movie_FFmpeg_Close (void)
 	unlink(pipename_audio);
 	unlink(pipename_video);
 
-	switch (pid = fork()) {
+	int mux_pipes[2];
+	pipe(mux_pipes);
+
+	signal(SIGCHLD, clean_up_mux_process);
+
+	switch (mux_pid = fork()) {
 		case -1:
 			Con_Printf("Error forking process!\n");
 			return;
 		case 0:
+			dup2 (mux_pipes[1], STDERR_FILENO);
+			dup2 (mux_pipes[1], STDOUT_FILENO);
+			close(mux_pipes[0]);
+			close(mux_pipes[1]);
+
 			Q_snprintfz(cmdline, sizeof(cmdline), 
-				"ffmpeg -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 \"%s\"",
+				"ffmpeg -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 -loglevel quiet -hide_banner -progress pipe:1 \"%s\"",
 				outpath_video, outpath_audio, outpath_combined
 			);
 
@@ -289,8 +324,25 @@ void Movie_FFmpeg_Close (void)
 			Con_Printf("Error starting: %d %d\n", status, errno);
 			return;
 		default:
+			mux_status = 1;
+			fcntl(mux_pipes[0], F_SETFL, fcntl(mux_pipes[0], F_GETFL) | O_NONBLOCK);
+			close(mux_pipes[1]);
+
+			char * txt = Q_calloc(4096*8, sizeof(char));
 			m_sink_mode = FFMPEG_SINK_NONE;
-			waitpid(0, NULL, 0);
+
+			while (mux_status) {
+				ssize_t bytes = read(mux_pipes[0], txt, 4096*8);
+				txt[bytes] = '\0';
+				if (bytes > 0)
+					parse_out_time(txt);
+				Sys_SendKeyEvents ();
+				SCR_UpdateScreen();
+			}
+
+			ssize_t bytes = read(mux_pipes[0], txt, 4096*8);
+
+			close(mux_pipes[0]);
 			if (!WIFEXITED(status))
 				Con_Printf("Error quitting mux ffmpeg!\n");
 			Con_Printf("Muxing completed to filename %s\n", outpath_combined);

@@ -78,6 +78,8 @@ static qboolean			m_encode_aborting	= false;
 static qboolean			m_finalizing		= false;
 static double			m_finalize_seconds	= 0;
 
+extern int capture_frames;
+
 pipe_status_t * ffmpeg_set_status(enum status_type type)
 {
 	pipe_status_t * st = Q_calloc(1, sizeof(pipe_status_t));
@@ -616,18 +618,38 @@ void Movie_FFmpeg_WriteAudio (int samples, const byte *sample_buffer)
 	fflush (m_ffmpeg_audio);
 }
 
+void parse_out_time(char * txt) 
+{
+	char *start, *end;
+	if ((start = Q_strcasestr(txt, "frame="))) {
+		if ((end = Q_strcasestr(start, "\n"))) {
+			*end = '\0';
+		}
+		double percent = 100.0 * atof(start+6) / (double) capture_frames;
+		Con_Printf("Mux progress: %s frames (%.1f%%)\n", start+6, percent);
+	}
+}
+
 void Movie_FFmpeg_Close (void)
 {
 	if (m_sink_mode == FFMPEG_SINK_ENCODE)
 	{
 		char				cmdline[16384];
 		DWORD		wexit;
+		DWORD       waitret;
 		PROCESS_INFORMATION		pi;
 		STARTUPINFO si;
 		Movie_FFmpeg_Encode_ClosePipes ();
+		Con_Printf("Muxing video with %d frames, don't quit until it's done...\n", capture_frames);
+
+		Sys_SendKeyEvents ();
+		SCR_UpdateScreen();
+
 		SCR_EndLoadingPlaque();
+		CL_Disconnect();
+
 		Q_snprintfz(cmdline, sizeof(cmdline),
-			"\"%s\" -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 \"%s\"",
+			"\"%s\" -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 -loglevel quiet -hide_banner -progress pipe:1 \"%s\"",
 			m_ffmpeg_exe, m_outpath_video, m_outpath_audio, m_outpath
 		);
 		if (!CreateProcessA(
@@ -646,11 +668,16 @@ void Movie_FFmpeg_Close (void)
 			return;
 		};
 
-		WaitForSingleObject(pi.hProcess, 60000);
+		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
+			Con_Printf("Muxin...\n");
+			Sys_SendKeyEvents ();
+			SCR_UpdateScreen();
+		}
+
 		GetExitCodeProcess(pi.hProcess, &wexit);
 
 		if (wexit != 0)
-			Con_Printf("ERROR: Mux ffmpeg didn't quit properly\n");
+			Con_Printf("ERROR: Mux ffmpeg didn't quit properly (exit code %ld)\n", wexit);
 
 		m_sink_mode = FFMPEG_SINK_NONE;
 		m_outpath_video[0] = '\0';

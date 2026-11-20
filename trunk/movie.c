@@ -110,7 +110,7 @@ static movie_capture_kind_t movie_capture_kind = MOVIE_CAP_NONE;
 
 /* capturedemo stats; printed from Movie_StopPlayback */
 static qboolean	capture_report_stats;
-static int	capture_frames;
+int	capture_frames;
 static int	capture_fps_used;
 static qboolean	capture_was_encode;
 static double	capture_t0;
