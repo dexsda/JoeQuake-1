@@ -682,7 +682,7 @@ void Movie_FFmpeg_Close (void)
 		CL_Disconnect();
 
 		Q_snprintfz(cmdline, sizeof(cmdline),
-			"\"%s\" -y -i \"%s\" -i \"%s\" -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 -loglevel quiet -hide_banner -progress pipe:1 \"%s\"",
+			"\"%s\" -y -i \"%s\" -i \"%s\" -c:v libx264 -c:a copy -map 0:v:0 -map 1:a:0 -loglevel quiet -hide_banner -progress pipe:1 \"%s\"",
 			m_ffmpeg_exe, m_outpath_video, m_outpath_audio, m_outpath
 		);
 		if (!CreateProcessA(
@@ -703,13 +703,11 @@ void Movie_FFmpeg_Close (void)
 
 		qboolean mux_done = false;
 		while ((waitret = WaitForSingleObject(pi.hProcess, 0)) == WAIT_TIMEOUT) {
-			Con_Printf("here 1");
 			Sys_SendKeyEvents();
 			SCR_UpdateScreen();
 			if (!mux_done) {
 				bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, 1024, &dwRead, NULL);
 				chBuf[dwRead] = '\0';
-				Con_Printf("here 2");
 				Sys_SendKeyEvents();
 				SCR_UpdateScreen();
 
@@ -719,7 +717,6 @@ void Movie_FFmpeg_Close (void)
 					parse_out_time(chBuf);
 				}
 
-				Con_Printf("here 3");
 				Sys_SendKeyEvents();
 				SCR_UpdateScreen();
 			}
